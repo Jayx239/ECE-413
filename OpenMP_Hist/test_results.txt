@@ -1,0 +1,23 @@
+Threads 2
+Serial Parallel
+0.01    0.00
+0.04    0.03
+0.45    0.25
+
+Threads 4
+Serial Parallel
+0.01    0.00
+0.05    0.02
+0.36    0.18
+
+Threads 8
+Serial Parallel
+0.01    0.00
+0.04    0.02
+0.37    0.12
+
+Threads 16
+Serial Parallel
+0.01    0.00
+0.05    0.01
+0.36    0.10
