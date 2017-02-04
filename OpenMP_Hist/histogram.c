@@ -17,7 +17,7 @@ void compute_using_openmp(int *, int *, int, int);
 void check_histogram(int *, int, int);
 
 #define HISTOGRAM_SIZE 500
-#define NUM_THREADS 8
+#define NUM_THREADS 16 
 
 ////////////////////////////////////////////////////////////////////////////////
 // Program main
@@ -112,12 +112,12 @@ void compute_using_openmp(int *input_data, int *histogram, int num_elements, int
 	#pragma omp parallel num_threads(NUM_THREADS) private(i) 
  	{
  	
-	int * private_hist = (int *)malloc(sizeof(int) * HISTOGRAM_SIZE);
- 
+	int * private_hist = calloc(HISTOGRAM_SIZE,sizeof(int));
+
  	#pragma omp for nowait
  	for (int x = 0; x < NUM_THREADS; x++) 
 	{
- 		for (int y = 0; y < num_elements ; y +=NUM_THREADS)
+ 		for (int y = 0; y+x < num_elements ; y +=NUM_THREADS)
 		{
   			private_hist[input_data[x+y]]++;
  		}
