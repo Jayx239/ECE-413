@@ -16,6 +16,19 @@
 
 #define MIN_NUMBER 2
 #define MAX_NUMBER 50
+#define NUM_THREADS 16 
+
+typedef struct param_t {
+    pthread_mutex_t* lock;
+    float* U;
+    int k;
+    int num_elements;
+} param_t;
+
+pthread_mutex_t mutex_lock;
+int threads_remaining = NUM_THREADS;
+int incr = 0;
+int j,k,i;
 
 /* Function prototypes. */
 extern int compute_gold (float *, unsigned int);
@@ -25,7 +38,7 @@ int perform_simple_check (const Matrix);
 void print_matrix (const Matrix);
 float get_random_number (int, int);
 int check_results (float *, float *, unsigned int, float);
-
+void* compute_gold_p(void* args_in);
 
 int
 main (int argc, char **argv)
@@ -81,9 +94,15 @@ main (int argc, char **argv)
       exit (0);
     }
   printf ("Single-threaded Gaussian elimination was successful. \n");
-
+    struct timeval start2,stop2;
   /* Perform the Gaussian elimination using pthreads. The resulting upper triangular matrix should be returned in U_mt */
+    gettimeofday(&start2,NULL);
   gauss_eliminate_using_pthreads (U_mt);
+    gettimeofday(&stop2,NULL);
+
+    printf ("CPU run time = %0.2f s. \n",
+      (float) (stop2.tv_sec - start2.tv_sec +
+           (stop2.tv_usec - start2.tv_usec) / (float) 1000000));
 
   /* check if the pthread result is equivalent to the expected solution within a specified tolerance. */
   int size = MATRIX_SIZE * MATRIX_SIZE;
@@ -103,59 +122,224 @@ main (int argc, char **argv)
 void
 gauss_eliminate_using_pthreads (Matrix U)
 {
+   pthread_t pthreads[NUM_THREADS];// = malloc(NUM_THREADS * sizeof(pthread_t));
+   param_t* params;
+    params = (param_t*) malloc(sizeof(param_t));
+    params->k = 0; 
+    params->num_elements = MATRIX_SIZE * MATRIX_SIZE;
+    params->U = (float*)U.elements;
+    //memcpy(&params->U,&U.elements,sizeof(U.elements));
+    //params->lock = malloc(sizeof(pthread_mutex_t));
+    //pthread_mutex_init(&(params->lock),NULL); 
+    //mutex_lock = malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init(&mutex_lock,NULL);
+    puts("here"); 
+    int i=0;
+    int rv;
+    for(i=0; i<NUM_THREADS; i++) {
+        rv = (int) pthread_create(&pthreads[i], NULL,compute_gold_p,(void*) params);
+        if(rv)
+            printf("Error creating pthread");
+    }
+    
+    for(i=0; i<NUM_THREADS; i++){
+        rv = (int) pthread_join(pthreads[i],NULL);
+        if(rv)
+            printf("Error joining threads");
+    }
+    /*int t_left = NUM_THREADS;
+    while(t_left > 0) {
+        while(pthread_mutex_trylock(&mutex_lock)){
+            
+        }
+        t_left = threads_remaining;
+        pthread_mutex_unlock(&mutex_lock);
+    }*/
+    
+
+       //params->U = malloc(1);
+    //memcpy(&U.elements,params->U,sizeof(params->U));
+    //free(params);
+//    free(pthreads);
+//    pthread_exit(NULL); 
 }
 
+void* compute_gold_p(void* args_in) {
+    param_t* arguments = (param_t*) args_in;
+    
+    int priv_k;
+    int num_elements;
+    //int i,j;
+puts("Entered logic");
+    while(pthread_mutex_trylock(&mutex_lock)!=0){
+    }
+//    pthread_mutex_lock(&arguments->lock);
+    int thread_num = arguments->k;
+    priv_k = (arguments->k)++;
+    num_elements = MATRIX_SIZE;//arguments->num_elements;
+    float* U = (float*) arguments->U;//malloc(sizeof(arguments->U));
+    //memcpy(&U,&arguments->U,sizeof(arguments->U));
+    //if(U[1] == arguments->U[1])
+      //  puts("equal");
+    pthread_mutex_unlock(&mutex_lock);
+    while(incr != thread_num){
+
+    }
+    //memcpy(&U,&arguments->U,sizeof(arguments->U));
+    //printf("%d,%d",num_elements,priv_k);
+    int i,j,k;
+    //while(priv_k < num_elements) {
+    int start_val = thread_num* (num_elements/NUM_THREADS);
+    int end_val = start_val + (num_elements/NUM_THREADS);
+
+    for(k=start_val; k<end_val; k++)
+    {
+      for (j = (k + 1); j < num_elements; j++)
+    {           // Reduce the current row
+      if (U[num_elements * k + k] == 0)
+        {
+          printf
+        ("Numerical instability detected. The principal diagonal element is zero. \n");
+          return 0;
+        }
+      U[num_elements * k + j] = (float) (U[num_elements * k + j] / U[num_elements * k + k]);    // Division step
+    }
+      U[num_elements * k + k] = 1;  // Set the principal diagonal entry in U to be 1
+      for (i = (k + 1); i < num_elements; i++)
+    {
+      for (j = (k + 1); j < num_elements; j++)
+        U[num_elements * i + j] = U[num_elements * i + j] - (U[num_elements * i + k] * U[num_elements * k + j]);    // Elimination step
+
+      U[num_elements * i + k] = 0;
+    }
+    }
+    incr++;
+//     while(pthread_mutex_trylock(&mutex_lock)!=0){
+  //          }
+    //for(k=start_val; k<end_val; k++) {
+      //  arguments->U[k] = U[k];
+    //}
+    threads_remaining--;
+    //incr++;
+    //pthread_mutex_unlock(&mutex_lock);
+    // while(threads_remaining > 0){
+
+    //}
+    //if(thread_num == 1)
+    //free(U);
+    //while(1){
+         
+    /*   while(pthread_mutex_trylock(&mutex_lock)!=0){
+            }
+            priv_k = (arguments->k)++;
+            if(priv_k >= num_elements){
+
+                    pthread_mutex_unlock(&mutex_lock);
+                    pthread_exit(NULL);      
+            }
+            pthread_mutex_unlock(&mutex_lock);
+            *//*while(incr < priv_k){
+                    if(incr == -1)
+                            pthread_exit(NULL);
+            } */
+            //pthread_mutex_unlock(&mutex_lock);
+            /*while(incr<priv_k){
+              if(incr == -1)
+              pthread_exit(NULL); 
+              }*/
+            //while(pthread_mutex_trylock(&mutex_lock)!=0){
+
+            //  }
+            /*for(j=priv_k+1; j<num_elements; j++) {
+                    // pthread_mutex_lock(&arguments->lock);
+                    //while(pthread_mutex_trylock(&mutex_lock)!=0){
+
+                    //}
+                    if(arguments->U[num_elements * priv_k + priv_k] == 0) {
+                            printf("Numerical instability detected. The principal diagonal element is zero. \n");
+                            arguments->k = num_elements;
+                            threads_remaining--;
+                            incr = -1;
+
+                            pthread_mutex_unlock(&mutex_lock);
+                            pthread_exit(NULL);
+                            //return 0;
+                    }
+                    //float calc;
+                    //calc  = (float) (arguments->U[num_elements * priv_k + j] / arguments->U[num_elements * priv_k + priv_k]);
+                    //arguments->U[num_elements*priv_k+j] = calc;
+                    arguments->U[num_elements* priv_k + j] = (float) (arguments->U[num_elements * priv_k + j] / arguments->U[num_elements * priv_k + priv_k]);
+                    //pthread_mutex_unlock(&mutex_lock); 
+            }
+            arguments->U[num_elements * priv_k + priv_k] = 1;
+            //incr++;
+            for(i=(priv_k + 1);i<num_elements; i++) {
+
+                    for(j=(priv_k + 1); j<num_elements; j++) {
+
+                            arguments->U[num_elements * i + j] = arguments->U[num_elements * i + j] - (arguments->U[num_elements * i + priv_k] * arguments->U[num_elements * priv_k + j]);
+                    }
+                    arguments->U[num_elements * i + priv_k] = 0;
+            }
+            //puts("end of loop"); 
+            incr++;
+            //pthread_mutex_unlock(&mutex_lock);
+
+    }*/
+    puts("exitting");
+    pthread_exit(NULL);
+}
 
 /* Function checks if the results generated by the single threaded and multi threaded versions match. */
-int
+        int
 check_results (float *A, float *B, unsigned int size, float tolerance)
 {
-  for (int i = 0; i < size; i++)
-    if (fabsf (A[i] - B[i]) > tolerance)
-      return 0;
-  return 1;
+        for (int i = 0; i < size; i++)
+                if (fabsf (A[i] - B[i]) > tolerance)
+                    return 0;
+        return 1;
 }
 
 
 /* Allocate a matrix of dimensions height*width
  * If init == 0, initialize to all zeroes.  
  * If init == 1, perform random initialization. 
-*/
-Matrix
+ */
+        Matrix
 allocate_matrix (int num_rows, int num_columns, int init)
 {
-  Matrix M;
-  M.num_columns = M.pitch = num_columns;
-  M.num_rows = num_rows;
-  int size = M.num_rows * M.num_columns;
+        Matrix M;
+        M.num_columns = M.pitch = num_columns;
+        M.num_rows = num_rows;
+        int size = M.num_rows * M.num_columns;
 
-  M.elements = (float *) malloc (size * sizeof (float));
-  for (unsigned int i = 0; i < size; i++)
-    {
-      if (init == 0)
-	M.elements[i] = 0;
-      else
-	M.elements[i] = get_random_number (MIN_NUMBER, MAX_NUMBER);
-    }
-  return M;
+        M.elements = (float *) malloc (size * sizeof (float));
+        for (unsigned int i = 0; i < size; i++)
+        {
+                if (init == 0)
+                        M.elements[i] = 0;
+                else
+                        M.elements[i] = get_random_number (MIN_NUMBER, MAX_NUMBER);
+        }
+        return M;
 }
 
 
 /* Returns a random floating-point number between the specified min and max values. */ 
-float
+        float
 get_random_number (int min, int max)
 {
-  return (float)
-    floor ((double)
-	   (min + (max - min + 1) * ((float) rand () / (float) RAND_MAX)));
+        return (float)
+                floor ((double)
+                                (min + (max - min + 1) * ((float) rand () / (float) RAND_MAX)));
 }
 
 /* Performs a simple check on the upper triangular matrix. Checks to see if the principal diagonal elements are 1. */
-int
+        int
 perform_simple_check (const Matrix M)
 {
-  for (unsigned int i = 0; i < M.num_rows; i++)
-    if ((fabs (M.elements[M.num_rows * i + i] - 1.0)) > 0.001)
-      return 0;
-  return 1;
+        for (unsigned int i = 0; i < M.num_rows; i++)
+                if ((fabs (M.elements[M.num_rows * i + i] - 1.0)) > 0.001)
+                        return 0;
+        return 1;
 }
