@@ -39,18 +39,26 @@ int local_n;
 
 int main(void) 
 {
+    struct timeval start1,stop1,start2,stop2;
 	int n = NUM_TRAPEZOIDS;
 	float a = LEFT_ENDPOINT;
 	float b = RIGHT_ENDPOINT;
 	float h = (b-a)/(float)n; // Height of each trapezoid  
-	printf("The height of the trapezoid is %f \n", h);
-
+    printf("The height of the trapezoid is %f \n", h);
+    
+    gettimeofday(&start1,NULL);
 	double reference = compute_gold(a, b, n, h);
-   printf("Reference solution computed on the CPU = %f \n", reference);
+    gettimeofday(&stop1,NULL);
+    float time1 = (float) (stop1.tv_sec - start1.tv_sec +(stop1.tv_usec - start1.tv_usec) / (float) 1000000);
+   printf("Reference solution computed on the CPU = %f \nRun time: %f\n", reference,time1);
 
 	/* Write this function to complete the trapezoidal on the GPU. */
+    gettimeofday(&start2,NULL);
 	double pthread_result = compute_using_pthreads(a, b, n, h);
-	printf("Solution computed using pthreads = %f \n", pthread_result);
+    gettimeofday(&stop2,NULL);
+    float time2 = (float) (stop2.tv_sec - start2.tv_sec +(stop2.tv_usec - start2.tv_usec) / (float) 1000000);
+	printf("Solution computed using pthreads = %f \nRun time: %f\n", pthread_result,time2);
+    printf("Speedup: %f times\n",time1/time2);
 } 
 
 
