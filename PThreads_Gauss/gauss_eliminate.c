@@ -13,23 +13,23 @@
 #include <math.h>
 #include <pthread.h>
 #include "gauss_eliminate.h"
+#include "mt.h"
 
 #define MIN_NUMBER 2
 #define MAX_NUMBER 50
-#define NUM_THREADS 16 
+#define NUM_THREADS 2 
 
 typedef struct param_t {
-    pthread_mutex_t* lock;
+    int thread_count;
     float* U;
-    int k;
-    int num_elements;
+    calc_t* calculations;
 } param_t;
 
 pthread_mutex_t mutex_lock;
 int threads_remaining = NUM_THREADS;
 int incr = 0;
 int j,k,i;
-
+int finished,no_instructions;
 /* Function prototypes. */
 extern int compute_gold (float *, unsigned int);
 Matrix allocate_matrix (int num_rows, int num_columns, int init);
@@ -108,7 +108,7 @@ main (int argc, char **argv)
   int size = MATRIX_SIZE * MATRIX_SIZE;
   int res = check_results (U_reference.elements, U_mt.elements, size, 0.001f);
   printf ("Test %s\n", (1 == res) ? "PASSED" : "FAILED");
-
+//    printf("%f,%f",U_mt.elements,U_reference.elements);
   /* Free memory allocated for the matrices. */
   free (A.elements);
   free (U_reference.elements);
@@ -125,17 +125,15 @@ gauss_eliminate_using_pthreads (Matrix U)
    pthread_t pthreads[NUM_THREADS];// = malloc(NUM_THREADS * sizeof(pthread_t));
    param_t* params;
     params = (param_t*) malloc(sizeof(param_t));
-    params->k = 0; 
-    params->num_elements = MATRIX_SIZE * MATRIX_SIZE;
     params->U = (float*)U.elements;
-    //memcpy(&params->U,&U.elements,sizeof(U.elements));
-    //params->lock = malloc(sizeof(pthread_mutex_t));
-    //pthread_mutex_init(&(params->lock),NULL); 
-    //mutex_lock = malloc(sizeof(pthread_mutex_t));
+    params->thread_count = 0;
+    params->calculations = (calc_t*) malloc(sizeof(calc_t));
+    params->calculations->i = -1;
     pthread_mutex_init(&mutex_lock,NULL);
-    puts("here"); 
+    no_instructions = 0; 
     int i=0;
     int rv;
+
     for(i=0; i<NUM_THREADS; i++) {
         rv = (int) pthread_create(&pthreads[i], NULL,compute_gold_p,(void*) params);
         if(rv)
@@ -147,146 +145,115 @@ gauss_eliminate_using_pthreads (Matrix U)
         if(rv)
             printf("Error joining threads");
     }
-    /*int t_left = NUM_THREADS;
-    while(t_left > 0) {
-        while(pthread_mutex_trylock(&mutex_lock)){
-            
-        }
-        t_left = threads_remaining;
-        pthread_mutex_unlock(&mutex_lock);
-    }*/
     
 
-       //params->U = malloc(1);
-    //memcpy(&U.elements,params->U,sizeof(params->U));
-    //free(params);
-//    free(pthreads);
-//    pthread_exit(NULL); 
+    //free(pthreads);
+    //pthread_exit(NULL); 
 }
 
 void* compute_gold_p(void* args_in) {
-    param_t* arguments = (param_t*) args_in;
     
-    int priv_k;
-    int num_elements;
-    //int i,j;
-puts("Entered logic");
+    param_t* arguments = args_in;
     while(pthread_mutex_trylock(&mutex_lock)!=0){
     }
-//    pthread_mutex_lock(&arguments->lock);
-    int thread_num = arguments->k;
-    priv_k = (arguments->k)++;
-    num_elements = MATRIX_SIZE;//arguments->num_elements;
-    float* U = (float*) arguments->U;//malloc(sizeof(arguments->U));
-    //memcpy(&U,&arguments->U,sizeof(arguments->U));
-    //if(U[1] == arguments->U[1])
-      //  puts("equal");
+    float* U = arguments->U;
+    int thread_num = arguments->thread_count++;
     pthread_mutex_unlock(&mutex_lock);
-    while(incr != thread_num){
-
-    }
-    //memcpy(&U,&arguments->U,sizeof(arguments->U));
-    //printf("%d,%d",num_elements,priv_k);
-    int i,j,k;
-    //while(priv_k < num_elements) {
-    int start_val = thread_num* (num_elements/NUM_THREADS);
-    int end_val = start_val + (num_elements/NUM_THREADS);
-
-    for(k=start_val; k<end_val; k++)
-    {
-      for (j = (k + 1); j < num_elements; j++)
-    {           // Reduce the current row
-      if (U[num_elements * k + k] == 0)
-        {
-          printf
-        ("Numerical instability detected. The principal diagonal element is zero. \n");
-          return 0;
-        }
-      U[num_elements * k + j] = (float) (U[num_elements * k + j] / U[num_elements * k + k]);    // Division step
-    }
-      U[num_elements * k + k] = 1;  // Set the principal diagonal entry in U to be 1
-      for (i = (k + 1); i < num_elements; i++)
-    {
-      for (j = (k + 1); j < num_elements; j++)
-        U[num_elements * i + j] = U[num_elements * i + j] - (U[num_elements * i + k] * U[num_elements * k + j]);    // Elimination step
-
-      U[num_elements * i + k] = 0;
-    }
-    }
-    incr++;
-//     while(pthread_mutex_trylock(&mutex_lock)!=0){
-  //          }
-    //for(k=start_val; k<end_val; k++) {
-      //  arguments->U[k] = U[k];
-    //}
-    threads_remaining--;
-    //incr++;
-    //pthread_mutex_unlock(&mutex_lock);
-    // while(threads_remaining > 0){
-
-    //}
-    //if(thread_num == 1)
-    //free(U);
-    //while(1){
-         
-    /*   while(pthread_mutex_trylock(&mutex_lock)!=0){
+    finished = 0;
+    int num_elements = NUM_THREADS; 
+    // First thread compiles all calculation attributes
+    // and places them in calculation queue for other threads
+    // calculate
+    if(thread_num == 0) {
+        calc_t* tail = arguments->calculations;
+        int i,j,k;
+        i=-2;
+        int num_elements = MATRIX_SIZE;
+        for(k=0; k< num_elements; k++) {
+            for(j=(k+1); j < num_elements; j++) {
+        //        while(pthread_mutex_trylock(&mutex_lock)!=0){
+          //      }
+                tail = push(tail,i,j,k,2);
+            //    pthread_mutex_unlock(&mutex_lock);
             }
-            priv_k = (arguments->k)++;
-            if(priv_k >= num_elements){
 
-                    pthread_mutex_unlock(&mutex_lock);
-                    pthread_exit(NULL);      
-            }
-            pthread_mutex_unlock(&mutex_lock);
-            *//*while(incr < priv_k){
-                    if(incr == -1)
-                            pthread_exit(NULL);
-            } */
-            //pthread_mutex_unlock(&mutex_lock);
-            /*while(incr<priv_k){
-              if(incr == -1)
-              pthread_exit(NULL); 
-              }*/
             //while(pthread_mutex_trylock(&mutex_lock)!=0){
-
-            //  }
-            /*for(j=priv_k+1; j<num_elements; j++) {
-                    // pthread_mutex_lock(&arguments->lock);
-                    //while(pthread_mutex_trylock(&mutex_lock)!=0){
-
-                    //}
-                    if(arguments->U[num_elements * priv_k + priv_k] == 0) {
-                            printf("Numerical instability detected. The principal diagonal element is zero. \n");
-                            arguments->k = num_elements;
-                            threads_remaining--;
-                            incr = -1;
-
-                            pthread_mutex_unlock(&mutex_lock);
-                            pthread_exit(NULL);
-                            //return 0;
-                    }
-                    //float calc;
-                    //calc  = (float) (arguments->U[num_elements * priv_k + j] / arguments->U[num_elements * priv_k + priv_k]);
-                    //arguments->U[num_elements*priv_k+j] = calc;
-                    arguments->U[num_elements* priv_k + j] = (float) (arguments->U[num_elements * priv_k + j] / arguments->U[num_elements * priv_k + priv_k]);
-                    //pthread_mutex_unlock(&mutex_lock); 
-            }
-            arguments->U[num_elements * priv_k + priv_k] = 1;
-            //incr++;
-            for(i=(priv_k + 1);i<num_elements; i++) {
-
-                    for(j=(priv_k + 1); j<num_elements; j++) {
-
-                            arguments->U[num_elements * i + j] = arguments->U[num_elements * i + j] - (arguments->U[num_elements * i + priv_k] * arguments->U[num_elements * priv_k + j]);
-                    }
-                    arguments->U[num_elements * i + priv_k] = 0;
-            }
-            //puts("end of loop"); 
-            incr++;
+            //}
+            tail = push(tail,i,j,k,1);
             //pthread_mutex_unlock(&mutex_lock);
 
-    }*/
-    puts("exitting");
+            for(i=(k+1); i< num_elements; i++) {
+                for(j=(k+1); j<num_elements; j++){
+               //     while(pthread_mutex_trylock(&mutex_lock)!=0){
+                 //   }
+                    tail = push(tail,i,j,k,3);
+                   // pthread_mutex_unlock(&mutex_lock);
+                }
+                //while(pthread_mutex_trylock(&mutex_lock)!=0){
+                //}   
+                tail = push(tail,i,j,k,0);
+               // pthread_mutex_unlock(&mutex_lock);
+            }
+        }
+        puts("first thread done");
+        finished = 1;
+    }
+    puts("here");
+//    no_instructions = 0;
+    while(!finished){
+
+    }
+
+    while(!finished || !no_instructions) {
+        //while(pthread_mutex_trylock(&mutex_lock)!=0){
+        //}
+            
+            calc_t* current_instruction = arguments->calculations;
+            if(current_instruction != NULL)
+                arguments->calculations = arguments->calculations->next_node;
+         //   pthread_mutex_unlock(&mutex_lock);
+        
+        if(current_instruction == NULL || no_instructions == 1) {
+            no_instructions = 1;
+            //puts("no instruction");
+        //    pthread_mutex_unlock(&mutex_lock);
+            continue;
+        }
+        /*else {
+            no_instructions = 0;
+            //puts("calcing with instr");
+        }*/
+        if(current_instruction == 0) {
+            //while(pthread_mutex_trylock(&mutex_lock)!=0){
+            //}
+                U[(num_elements * current_instruction->i)+current_instruction->k] = 1;
+            //pthread_mutex_unlock(&mutex_lock);
+        }
+        else if(current_instruction->type == 1) {
+            //while(pthread_mutex_trylock(&mutex_lock)!=0){
+            //}
+               U[(current_instruction->k)*(num_elements + 1)] = 1; 
+            //pthread_mutex_unlock(&mutex_lock);
+        }
+        else if(current_instruction->type == 2) {
+            //while(pthread_mutex_trylock(&mutex_lock)!=0){
+            //}
+            
+            U[(num_elements * current_instruction->k) + current_instruction->j] = (float) (U[num_elements * current_instruction->k + current_instruction->j] / U[num_elements * current_instruction->k + current_instruction->k]);
+            
+        //    pthread_mutex_unlock(&mutex_lock);
+        }
+        else if(current_instruction->type == 3) {
+          //  while(pthread_mutex_trylock(&mutex_lock)!=0){
+            //}
+            
+            U[num_elements * current_instruction->i + current_instruction->j] = U[num_elements * current_instruction->i + current_instruction->j] - (U[num_elements * current_instruction->i + current_instruction->k] * U[num_elements * current_instruction->k + current_instruction->j]);    // Elimination step
+
+            
+            //pthread_mutex_unlock(&mutex_lock);
+        }
+        //pthread_mutex_unlock(&mutex_lock);
+    }
     pthread_exit(NULL);
 }
 
