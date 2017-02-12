@@ -3,7 +3,7 @@
 
 typedef struct {
     int thread_num;
-    int k;
+    unsigned int k;
     Matrix* matrix;
 } arguments;
 

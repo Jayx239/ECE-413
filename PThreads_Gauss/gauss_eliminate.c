@@ -160,8 +160,6 @@ void* division_step(void * input)
     U[num_elements * k + j] = (float) (U[num_elements * k + j] / U[num_elements * k + k]);
   }
 
-  U[num_elements * k + k] = 1;  // Set the principal diagonal entry in U to be 1
-
   decrement_turn();
  
   while(get_turn() >= -NUM_THREADS && get_turn() != (NUM_THREADS-1))
@@ -169,21 +167,17 @@ void* division_step(void * input)
     if(DEBUG)
       printf("Waiting in turn: %d\n",get_turn());
   } 
-    
+
+  U[num_elements * k + k] = 1;  // Set the principal diagonal entry in U to be 1
+   
   for (i = chunck_start; i < end_chunck; i++)
   {
-    for (j = chunck_start; j < end_chunck; j++)
+    for (j = k+1; j < num_elements; j++)
       U[num_elements * i + j] = U[num_elements * i + j] - (U[num_elements * i + k] * U[num_elements * k + j]);    // Elimination step
 
     U[num_elements * i + k] = 0;
   }
-
-  while(get_turn() >= -NUM_THREADS && get_turn() != NUM_THREADS-1)
-  {
-    if(DEBUG)
-      printf("Waiting in turn: %d\n",get_turn());
-  }
-    
+  
   reset_turn(NUM_THREADS-1);
 
 }
@@ -218,22 +212,17 @@ void * elimination_step(void* input) {
 
   decrement_turn();
   
-  int chunck_start = ((int) (num_elements/NUM_THREADS)) * thread_num;
-  int end_chunck = chunck_start + ((int)(num_elements/NUM_THREADS));
+  int chunck_start = k+1+thread_num;
 
-  if(chunck_start < k+1)
-    chunck_start = k+1;
   int i,j;
 
-  if( thread_num == NUM_THREADS-1)
-    end_chunck = num_elements;
 
   if(DEBUG)
     printf("Starting loop: Thread %d\n",thread_num);
 
-  for (i = chunck_start; i < end_chunck; i++)
+  for (i = chunck_start; i < num_elements; i+=NUM_THREADS)
   {
-    for (j = chunck_start; j < end_chunck; j++)
+    for (j = chunck_start; j < num_elements; j++)
       U[num_elements * i + j] = U[num_elements * i + j] - (U[num_elements * i + k] * U[num_elements * k + j]);    // Elimination step
       U[num_elements * i + k] = 0;
   }
@@ -253,10 +242,20 @@ gauss_eliminate_using_pthreads (Matrix U)
 {
   unsigned int i,j,k;
   int rv;
+  pthread_t pthreads[NUM_THREADS];
+  arguments args[NUM_THREADS];
+  
   pthread_mutex_init(&mutex,NULL);
   reset_turn((NUM_THREADS-1));
-  
-  for(int i=0; i<U.num_rows; i++)
+    
+  for(j=0; j<NUM_THREADS; j++)
+  {
+    args[j].thread_num = j;
+    args[j].matrix = &U; 
+  }
+
+ 
+  for(i=0; i<U.num_rows; i++)
   {
     
     if(U.elements[U.num_rows * i + i] == 0)
@@ -265,14 +264,10 @@ gauss_eliminate_using_pthreads (Matrix U)
        return; 
     } 
     
-    pthread_t pthreads[NUM_THREADS];
-    arguments args[4];
     
     /* Division Step */
     for(j=0; j<NUM_THREADS; j++)
     {
-      args[j].thread_num = j;
-      args[j].matrix = &U;
       args[j].k = i;
       rv = (int) pthread_create(&pthreads[j], NULL, division_step,(void*) &args[j]);
 
