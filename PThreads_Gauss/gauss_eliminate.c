@@ -18,7 +18,8 @@
 #define MIN_NUMBER 2
 #define MAX_NUMBER 50
 #define NUM_THREADS 4 
-#define DEBUG 0 
+#define DEBUG 0
+ 
 // Multithreaded Globals
 pthread_mutex_t mutex;
 volatile int* init_turn;
@@ -32,6 +33,7 @@ int perform_simple_check (const Matrix);
 void print_matrix (const Matrix);
 float get_random_number (int, int);
 int check_results (float *, float *, unsigned int, float);
+void* eliminate_row(void*  input);
 
 // helper functions
 int get_turn(){if(DEBUG)puts("in get turn"); while(pthread_mutex_trylock(&mutex)!=0){}; int turn = *init_turn;pthread_mutex_unlock(&mutex); if(DEBUG)puts("out get turn");return turn;}
@@ -116,7 +118,9 @@ int main (int argc, char **argv)
   return 0;
 }
 
-void* division_step(void * input)
+//**************************************
+// pthread code for gausian elimation
+void* eliminate_row(void * input)
 {    
   arguments* args = (arguments*) input;
   if(DEBUG)
@@ -170,7 +174,7 @@ void* division_step(void * input)
 
   U[num_elements * k + k] = 1;  // Set the principal diagonal entry in U to be 1
    
-  for (i = chunck_start; i < end_chunck; i++)
+  for (i = (k+thread_num+1); i < num_elements; i+=NUM_THREADS)
   {
     for (j = k+1; j < num_elements; j++)
       U[num_elements * i + j] = U[num_elements * i + j] - (U[num_elements * i + k] * U[num_elements * k + j]);    // Elimination step
@@ -181,60 +185,7 @@ void* division_step(void * input)
   reset_turn(NUM_THREADS-1);
 
 }
-
-void * elimination_step(void* input) {
-  
-  arguments* args = (arguments*) input;
-  
-  if(DEBUG)
-    puts("entered elimination step");
-  
-  int thread_num = args->thread_num;
-
-  while(get_turn() != (thread_num))
-  {
-    if(DEBUG)
-      printf("Thread %d: Thread turn: %d\n",thread_num,get_turn());
-  }
-
-  float* U = args->matrix->elements;
-  int k = args->k;
-  unsigned int num_elements = args->matrix->num_rows;// * U->num_columns;
-
-  decrement_turn();
-
-  while(get_turn() >= 0)
-  {
-    if(DEBUG)
-      printf("Turn: %d\n",get_turn());
-
-  }
-
-  decrement_turn();
-  
-  int chunck_start = k+1+thread_num;
-
-  int i,j;
-
-
-  if(DEBUG)
-    printf("Starting loop: Thread %d\n",thread_num);
-
-  for (i = chunck_start; i < num_elements; i+=NUM_THREADS)
-  {
-    for (j = chunck_start; j < num_elements; j++)
-      U[num_elements * i + j] = U[num_elements * i + j] - (U[num_elements * i + k] * U[num_elements * k + j]);    // Elimination step
-      U[num_elements * i + k] = 0;
-  }
-
-  while(get_turn() >= -NUM_THREADS && get_turn() != (NUM_THREADS-1))
-  {
-    if(DEBUG)
-      printf("Waiting in turn: %d\n",get_turn());
-  }
-    
-  reset_turn(NUM_THREADS-1);
-}
+//**************************************
 
 /* Write code to perform gaussian elimination using pthreads. */
 void
@@ -264,47 +215,22 @@ gauss_eliminate_using_pthreads (Matrix U)
        return; 
     } 
     
-    
-    /* Division Step */
     for(j=0; j<NUM_THREADS; j++)
     {
       args[j].k = i;
-      rv = (int) pthread_create(&pthreads[j], NULL, division_step,(void*) &args[j]);
+      rv = (int) pthread_create(&pthreads[j], NULL, eliminate_row,(void*) &args[j]);
 
       if(rv)
         printf("Error creating thread: %d",j);
     }
-     
-    
+
+
     for(j=0; j<NUM_THREADS; j++)
     {
       rv = (int) pthread_join(pthreads[j],NULL);
       if(rv)
         printf("Error joining thread: %d\n",j);
-    }
-
-    if(DEBUG)
-      printf("Division step complete\n");
-
-    U.elements[U.num_rows * i + i] = 1;
-    
-    /* Elimination step */
-    for(j=0; j<NUM_THREADS; j++)
-    {
-      rv = (int) pthread_create(&pthreads[j], NULL, elimination_step,(void*) &args[j]);
-      if(rv)
-        printf("Error creating thread: %d",j);
-    }
-    
-    for(j=0; j<NUM_THREADS; j++)
-    {
-      rv = (int) pthread_join(pthreads[j],NULL);
-      if(rv)
-        printf("Error joining thread: %d",j);
-    }
-
-    if(DEBUG)
-      printf("Elimination step complete\n");    
+    }  
   }
 }
 
