@@ -17,7 +17,7 @@
 
 #define MIN_NUMBER 2
 #define MAX_NUMBER 50
-#define NUM_THREADS 4 
+#define NUM_THREADS 16 
 #define DEBUG 0
  
 // Multithreaded Globals
@@ -36,10 +36,10 @@ int check_results (float *, float *, unsigned int, float);
 void* eliminate_row(void*  input);
 
 // helper functions
-int get_turn(){if(DEBUG)puts("in get turn"); while(pthread_mutex_trylock(&mutex)!=0){}; int turn = *init_turn;pthread_mutex_unlock(&mutex); if(DEBUG)puts("out get turn");return turn;}
-void reset_turn(int size){if(DEBUG)puts("in reset turn");while(pthread_mutex_trylock(&mutex)!=0){}; if(init_turn == NULL)init_turn = malloc(sizeof(int)); *init_turn = size; pthread_mutex_unlock(&mutex); if(DEBUG)puts("out reset turn");}
-void decrement_turn(){if(DEBUG)puts("in decrement"); while(pthread_mutex_trylock(&mutex)!=0){}; *init_turn= *init_turn-1; pthread_mutex_unlock(&mutex); if(DEBUG)puts("out decrement");}
-void increment_turn(){if(DEBUG)puts("in increment"); while(pthread_mutex_trylock(&mutex)!=0){}; *init_turn= *init_turn-1; pthread_mutex_unlock(&mutex); if(DEBUG)puts("out increment");}
+int get_turn();
+void reset_turn(int size);
+void decrement_turn();
+void increment_turn();
 
 int main (int argc, char **argv)
 {
@@ -122,11 +122,15 @@ int main (int argc, char **argv)
 // pthread code for gausian elimation
 void* eliminate_row(void * input)
 {    
+  /*Get input arguments */
   arguments* args = (arguments*) input;
+
   if(DEBUG)
-    puts("entered division step");
-  int thread_num = args->thread_num;
-  
+    puts("Entered division step");
+  int i,j,thread_num;
+  thread_num = args->thread_num;
+
+  /* Initialize values */
   while(get_turn() != (thread_num))
   {
     if(DEBUG)
@@ -138,7 +142,8 @@ void* eliminate_row(void * input)
   unsigned int num_elements = args->matrix->num_rows;// * U->num_columns;
   
   decrement_turn();
- 
+
+  /* Synchronize */
   while(get_turn() >= 0)
   {
     if(DEBUG)
@@ -146,26 +151,30 @@ void* eliminate_row(void * input)
     
   }
 
+  /* Set chunck size */
   int chunck_start = ((int) (num_elements/NUM_THREADS)) * thread_num;
   int end_chunck = chunck_start + ((int)(num_elements/NUM_THREADS));
-
+  
+  /* Ignore earlier */
   if(chunck_start < k+1)
     chunck_start = k+1;
-  int i,j;
-
+    
+  /* make last thread go until end*/
   if( thread_num == NUM_THREADS-1)
     end_chunck = num_elements;
   
   if(DEBUG)
     printf("Starting loop: Thread %d\n",thread_num); 
 
+  /* Division step */
   for(j=chunck_start; j <end_chunck; j++)
   {
     U[num_elements * k + j] = (float) (U[num_elements * k + j] / U[num_elements * k + k]);
   }
 
   decrement_turn();
- 
+  
+  /* Synchronize */ 
   while(get_turn() >= -NUM_THREADS && get_turn() != (NUM_THREADS-1))
   {
     if(DEBUG)
@@ -173,7 +182,8 @@ void* eliminate_row(void * input)
   } 
 
   U[num_elements * k + k] = 1;  // Set the principal diagonal entry in U to be 1
-   
+
+  /* Elimination setp */   
   for (i = (k+thread_num+1); i < num_elements; i+=NUM_THREADS)
   {
     for (j = k+1; j < num_elements; j++)
@@ -182,6 +192,7 @@ void* eliminate_row(void * input)
     U[num_elements * i + k] = 0;
   }
   
+  /* Reset counter */
   reset_turn(NUM_THREADS-1);
 
 }
@@ -191,21 +202,23 @@ void* eliminate_row(void * input)
 void
 gauss_eliminate_using_pthreads (Matrix U)
 {
+  /* Variables */
   unsigned int i,j,k;
   int rv;
   pthread_t pthreads[NUM_THREADS];
   arguments args[NUM_THREADS];
-  
+ 
+  /* Initialize */ 
   pthread_mutex_init(&mutex,NULL);
   reset_turn((NUM_THREADS-1));
-    
+
   for(j=0; j<NUM_THREADS; j++)
   {
     args[j].thread_num = j;
     args[j].matrix = &U; 
   }
 
- 
+  /* Perform elimination */
   for(i=0; i<U.num_rows; i++)
   {
     
@@ -214,7 +227,8 @@ gauss_eliminate_using_pthreads (Matrix U)
        printf("Numerical instability detected. The principal diagonal element is zero. \n");
        return; 
     } 
-    
+
+    /* Create threads */
     for(j=0; j<NUM_THREADS; j++)
     {
       args[j].k = i;
@@ -224,7 +238,7 @@ gauss_eliminate_using_pthreads (Matrix U)
         printf("Error creating thread: %d",j);
     }
 
-
+    /* Join threads */
     for(j=0; j<NUM_THREADS; j++)
     {
       rv = (int) pthread_join(pthreads[j],NULL);
@@ -292,3 +306,61 @@ perform_simple_check (const Matrix M)
       return 0;
   return 1;
 }
+
+/* Helper functions */
+int get_turn()
+{
+  if(DEBUG)
+    puts("in get turn");
+  while(pthread_mutex_trylock(&mutex)!=0){}; 
+  int turn = *init_turn;pthread_mutex_unlock(&mutex); 
+  if(DEBUG)
+    puts("out get turn");
+  return turn;
+}
+
+void reset_turn(int size)
+{
+  if(DEBUG)
+    puts("in reset turn");
+  while(pthread_mutex_trylock(&mutex)!=0)
+  {
+  }
+
+  if(init_turn == NULL)
+    init_turn = malloc(sizeof(int));
+
+  *init_turn = size;
+  pthread_mutex_unlock(&mutex); 
+  if(DEBUG)
+    puts("out reset turn");
+}
+
+void decrement_turn()
+{
+  if(DEBUG)
+    puts("in decrement");
+  while(pthread_mutex_trylock(&mutex)!=0)
+  { 
+  }
+  
+  *init_turn= *init_turn-1;
+  pthread_mutex_unlock(&mutex);
+  if(DEBUG)
+    puts("out decrement");
+}
+void increment_turn()
+{
+  if(DEBUG)
+    puts("in increment"); 
+  while(pthread_mutex_trylock(&mutex)!=0)
+  {
+  }
+  
+  *init_turn= *init_turn-1; 
+  pthread_mutex_unlock(&mutex); 
+  if(DEBUG)
+    puts("out increment");
+}
+
+/* End helper functions */
