@@ -3,6 +3,15 @@ ECEC-413
 Jason Gallagher
 Steve Kravitsky
 
+To build:
+    make all
+With gdb debug option:
+    make db
+To run:
+     ./gauss_eliminate
+To Clean directory:
+    make clean
+
 Program Description:
     This program tests the execution time of two different implementations of the Gaussian
 elimination algorithm. We developed a parallel version of the algorith written using POSIX 
