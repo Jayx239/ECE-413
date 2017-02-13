@@ -139,7 +139,7 @@ void* eliminate_row(void * input)
 
   float* U = args->matrix->elements;
   int k = args->k;
-  unsigned int num_elements = args->matrix->num_rows;// * U->num_columns;
+  unsigned int num_elements = args->matrix->num_rows;
   
   decrement_turn();
 
@@ -180,14 +180,15 @@ void* eliminate_row(void * input)
     if(DEBUG)
       printf("Waiting in turn: %d\n",get_turn());
   } 
-
-  U[num_elements * k + k] = 1;  // Set the principal diagonal entry in U to be 1
+  
+  /* Set the principal diagonal entry in U to be 1*/
+  U[num_elements * k + k] = 1;
 
   /* Elimination setp */   
   for (i = (k+thread_num+1); i < num_elements; i+=NUM_THREADS)
   {
     for (j = k+1; j < num_elements; j++)
-      U[num_elements * i + j] = U[num_elements * i + j] - (U[num_elements * i + k] * U[num_elements * k + j]);    // Elimination step
+      U[num_elements * i + j] = U[num_elements * i + j] - (U[num_elements * i + k] * U[num_elements * k + j]);
 
     U[num_elements * i + k] = 0;
   }
@@ -258,6 +259,7 @@ check_results (float *A, float *B, unsigned int size, float tolerance)
       count++;
 
   printf("Num differences: %d\nOut of: %d\npercent error: %f\n",count,size,(1.0*count/size));
+
   if(count)
     return 0;
   return 1;
