@@ -11,6 +11,7 @@
 #include <sys/time.h>
 #include <string.h>
 #include <math.h>
+#include <xmmintrin.h>
 #include "gauss_eliminate.h"
 
 #define MIN_NUMBER 2
@@ -43,7 +44,7 @@ main(int argc, char** argv) {
 		
 	/* Gaussian elimination using the reference code. */
 	Matrix reference = allocate_matrix(MATRIX_SIZE, MATRIX_SIZE, 0);
-	struct timeval start, stop;	
+	struct timeval start, stop, start2, stop2;	
 	gettimeofday(&start, NULL);
 
 	printf("Performing gaussian elimination using the reference code. \n");
@@ -66,9 +67,13 @@ main(int argc, char** argv) {
 	/* WRITE THIS CODE: Perform the Gaussian elimination using the SSE version. 
      * The resulting upper triangular matrix should be returned in U
      * */
+    gettimeofday(&start2, NULL);
 	gauss_eliminate_using_sse(A, U);
-
+    gettimeofday(&stop2, NULL);
 	/* Check if the SSE result is equivalent to the expected solution. */
+
+    printf("SSE run time = %0.2f s. \n", (float)(stop2.tv_sec - start2.tv_sec + (stop2.tv_usec - start2.tv_usec)/(float)1000000));
+
 	int size = MATRIX_SIZE*MATRIX_SIZE;
 	int res = check_results(reference.elements, U.elements, size, 0.001f);
 	printf("Test %s\n", (1 == res) ? "PASSED" : "FAILED");
@@ -84,15 +89,95 @@ main(int argc, char** argv) {
 void 
 gauss_eliminate_using_sse(const Matrix A, Matrix U)                  /* Write code to perform gaussian elimination using OpenMP. */
 {
+    /* Copy input matrix */
+    memcpy(&U,&A,sizeof(A));
+    float* off1_elems = malloc(sizeof(A.elements));
+    off1_elems = &U.elements[1];
+    off1_elems[(U.num_rows*U.num_rows)] = 0;
+   
+    int i,j,k; 
+    int r_num_rows = A.num_rows;
+    int num_rows = r_num_rows;    
+    float inverted[sizeof(A.elements)];// = malloc(sizeof(U.elements)*sizeof(float));
+//    for(i=0; i<num_rows; i++)
+  //      for(j=0; j<num_rows; j++)
+    //        inverted[num_rows*i + j] = U.elements[num_rows*j + i];
+    
+    __m128 zero = _mm_set1_ps(0.0f);//(__m128 ) {0.0,0.0,0.0,0.0};
+    __m128 one = _mm_set1_ps(1.0f);//(__m128) {1.0,1.0,1.0,1.0};
+    __m128 *vector_u = (__m128*) U.elements;
+    __m128 iptr,jptr,kptr,inkptr,off1ptr,temp,temp2;
+    //off1ptr = (__m128*) off1_elems;
+    
+//    iptr = vector_u;
+  //  jptr = vector_u;
+    //inkptr = kptr = *vector_u;
+        
+
+    for(k=0; k<num_rows/4; k++)
+    {
+        inkptr = _mm_load1_ps(&U.elements[num_rows*k + k]);//kptr+(k*(num_rows/4));
+//        jptr = kptr+(num_rows/4) ;
+
+        for(j=(k+1); j<(num_rows/4); j++)
+        {
+            if (U.elements[num_rows*k + k] == 0){
+                printf("Numerical instability detected. The principal diagonal element is zero. \n");
+                return;
+            }
+            
+            jptr = _mm_load_ps(&U.elements[num_rows*k+j]);
+            temp = _mm_div_ps(jptr,inkptr);
+            //_mm_store_ps(&U.elements[num_rows*k+j],temp);
+            //jptr++;
+        }
+
+        U.elements[num_rows*k+k] = 1;
+
+        for(i=(k+1); i< (num_rows/4)-1; i++)
+        {
+            iptr = _mm_load_ps(&U.elements[num_rows*i+k]);
+//            jptr = _mm_load1_ps(&U.elements[num_rows*i+j];
+            //iptr = &vector_u[num_rows*i+k];
+            //jptr = iptr+(num_rows/4); 
+            //inkptr = &vector_u[((num_rows/4)*k)+k];
+            for(j=(k+1); j<(num_rows/4)-1; j++)
+            {
+                jptr = _mm_load_ps(&U.elements[num_rows*i+j]);
+                inkptr = _mm_load_ps(&U.elements[num_rows*k + j]);
+
+                temp = _mm_mul_ps(iptr,inkptr);
+                temp2 = _mm_div_ps(jptr,temp);
+                jptr = temp2;
+                float temp_v;// = malloc(4*sizeof(float));
+                _mm_store_ps(&temp_v,temp2);
+                memcpy(&U.elements[num_rows*i+j],&temp_v,sizeof(temp_v));
+                //jptr++;
+                //inkptr++;
+            }
+            __m128* lower_tri = (__m128*) &vector_u[i*num_rows+k];
+             *lower_tri = _mm_mul_ps(zero,zero);
+            iptr = _mm_mul_ps(zero,zero);
+           // U.elements[num_rows*i+k] = 0;
+            //iptr++;
+        }
+        kptr++;
+    } 
 }
 
 
 int 
 check_results(float *A, float *B, unsigned int size, float tolerance)   /* Check if refernce results match multi threaded results. */
 {
+    int num_off = 0;
 	for(int i = 0; i < size; i++)
 		if(fabsf(A[i] - B[i]) > tolerance)
-			return 0;
+            num_off++;    
+
+    printf("Percent difference: %f\n",num_off/(size*1.0));
+
+    if(num_off != 0)
+        return 0;
 	
     return 1;
 }
@@ -127,8 +212,13 @@ get_random_number(int min, int max){                                    /* Retur
 
 int 
 perform_simple_check(const Matrix M){                                   /* Check for upper triangular matrix, that is, the principal diagonal elements are 1. */
+    int num_off = 0;
     for(unsigned int i = 0; i < M.num_rows; i++)
-        if((fabs(M.elements[M.num_rows*i + i] - 1.0)) > 0.001) return 0;
+        if((fabs(M.elements[M.num_rows*i + i] - 1.0)) > 0.001) 
+            num_off++;
+
+    if(num_off != 0)
+        return 0;
 	
     return 1;
 } 
