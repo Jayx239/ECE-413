@@ -117,13 +117,17 @@ gauss_eliminate_using_sse(const Matrix A, Matrix U)                  /* Write co
                 printf("Numerical instability detected. The principal diagonal element is zero. \n");
                 return;
             }
-
-            inkptr = _mm_load_ps1(&u_elems[((num_rows*k) + k)*4]); 
-            jptr = _mm_load_ps(&u_elems[((num_rows*k)+j)*4]);
+            for(z = (3 * num_rows); z>=0; z-=(num_rows))
+                {
+                    if( z > num_rows*k)
+                        break;
+            inkptr = _mm_load_ps1(&u_elems[((num_rows*k) + k)*4-z]); 
+            jptr = _mm_load_ps(&u_elems[((num_rows*k)+j)*4-z]);
             temp = _mm_div_ps(jptr,inkptr);
             //jptr = temp;
-            _mm_store_ps(&u_elems[((num_rows*k)+j*4)],temp);
+            _mm_store_ps(&u_elems[((num_rows*k)+j*4-z)],temp);
             //jptr++;
+            }
         }
         
         for(i=k*4; i>(k*4)-4; i--)
@@ -148,13 +152,18 @@ gauss_eliminate_using_sse(const Matrix A, Matrix U)                  /* Write co
             {
                   //  printf("k:%d    j:%d\n",k,j);
                 
-                iptr = _mm_load1_ps(&u_elems[((num_rows*i)+k)*4]);
-                jptr = _mm_load_ps(&u_elems[((num_rows*i)+j)*4]);
-                inkptr = _mm_load_ps(&u_elems[((num_rows*k) + j)*4]);
-                
-                temp = _mm_mul_ps(iptr,inkptr);
-                jptr = _mm_sub_ps(jptr,temp);
-                _mm_store_ps(&u_elems[((num_rows*i)+j)*4],jptr); 
+                for(z = (3 * num_rows); z>=0; z-=(num_rows))
+                {
+                    if( z > num_rows*k)
+                        break;
+                    iptr = _mm_load1_ps(&u_elems[((num_rows*i)+k)*4-z]);
+                    jptr = _mm_load_ps(&u_elems[((num_rows*i)+j)*4-z]);
+                    inkptr = _mm_load_ps(&u_elems[((num_rows*k) + j)*4-z]);
+                    temp = _mm_mul_ps(iptr,inkptr);
+                    
+                    jptr = _mm_sub_ps(jptr,temp);
+                    _mm_store_ps(&u_elems[((num_rows*i)+j)*4-z],jptr); 
+                }
 /*
                 iptr = _mm_load1_ps(&u_elems[((num_rows*i)+k)]);
                 jptr = _mm_load_ps(&u_elems[((num_rows*(i))+j)*4]);
@@ -166,12 +175,12 @@ gauss_eliminate_using_sse(const Matrix A, Matrix U)                  /* Write co
   */              
             }
     
-        //for(z=i*4; z>(i*4)-4; z--)
-          //  {
-            //if(i < 0)
-              //  break;
-                u_elems[((num_rows*i)+k)] = 0.0f;       
-            //}
+        for(z=i*4; z>(i*4)-4; z--)
+            {
+            if(i < 0)
+              break;
+                u_elems[((num_rows*z)+k)] = 0.0f;       
+            }
             //for(j=i*4; j<(i*4)+4; j++)
                 //u_elems[((num_rows*j)+k)] = 0;
 
