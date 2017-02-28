@@ -90,79 +90,95 @@ void
 gauss_eliminate_using_sse(const Matrix A, Matrix U)                  /* Write code to perform gaussian elimination using OpenMP. */
 {
     /* Copy input matrix */
-    memcpy(&U,&A,sizeof(A));
-    float* off1_elems = malloc(sizeof(A.elements));
-    off1_elems = &U.elements[1];
-    off1_elems[(U.num_rows*U.num_rows)] = 0;
-   
-    int i,j,k; 
+    //memcpy(&U,&A,sizeof(A));
+    float* u_elems = U.elements;//malloc(sizeof(A.elements)+15);
+     
+    unsigned int i,j,k,z; 
     int r_num_rows = A.num_rows;
-    int num_rows = r_num_rows;    
-    float inverted[sizeof(A.elements)];// = malloc(sizeof(U.elements)*sizeof(float));
-//    for(i=0; i<num_rows; i++)
-  //      for(j=0; j<num_rows; j++)
-    //        inverted[num_rows*i + j] = U.elements[num_rows*j + i];
+    int num_rows = r_num_rows; 
+    __m128 iptr,jptr,kptr,inkptr,temp,temp2;
     
-    __m128 zero = _mm_set1_ps(0.0f);//(__m128 ) {0.0,0.0,0.0,0.0};
-    __m128 one = _mm_set1_ps(1.0f);//(__m128) {1.0,1.0,1.0,1.0};
-    __m128 *vector_u = (__m128*) U.elements;
-    __m128 iptr,jptr,kptr,inkptr,off1ptr,temp,temp2;
-    //off1ptr = (__m128*) off1_elems;
-    
-//    iptr = vector_u;
-  //  jptr = vector_u;
-    //inkptr = kptr = *vector_u;
-        
+    for(i=0; i<num_rows/4; i++) {
+        for(j=0; j<num_rows/4; j++) {
+            jptr = _mm_load_ps(&A.elements[((num_rows*i)+j)*4]);
+            _mm_store_ps(&u_elems[((num_rows*i)+j*4)],jptr);
+        }
+    }    
 
     for(k=0; k<num_rows/4; k++)
     {
-        inkptr = _mm_load1_ps(&U.elements[num_rows*k + k]);//kptr+(k*(num_rows/4));
+        inkptr = _mm_load_ps1(&u_elems[((num_rows*k) + k)]);//kptr+(k*(num_rows/4));
 //        jptr = kptr+(num_rows/4) ;
-
+        
         for(j=(k+1); j<(num_rows/4); j++)
         {
-            if (U.elements[num_rows*k + k] == 0){
+            printf("k:%d   j:%d\n",k,j);
+            if (u_elems[((num_rows*k) + k)] == 0){
                 printf("Numerical instability detected. The principal diagonal element is zero. \n");
                 return;
             }
-            
-            jptr = _mm_load_ps(&U.elements[num_rows*k+j]);
+
+            inkptr = _mm_load_ps1(&u_elems[((num_rows*k) + k)*4]); 
+            jptr = _mm_load_ps(&u_elems[((num_rows*k)+j)*4]);
             temp = _mm_div_ps(jptr,inkptr);
-            //_mm_store_ps(&U.elements[num_rows*k+j],temp);
+            //jptr = temp;
+            _mm_store_ps(&u_elems[((num_rows*k)+j*4)],temp);
             //jptr++;
         }
-
-        U.elements[num_rows*k+k] = 1;
-
-        for(i=(k+1); i< (num_rows/4)-1; i++)
+        
+        for(i=k*4; i>(k*4)-4; i--)
         {
-            iptr = _mm_load_ps(&U.elements[num_rows*i+k]);
+            if(i < 0)
+                break;
+            u_elems[((num_rows*i)+i)] = 1.0f;
+            //u_elems[((num_rows*(k+1))+k+1)] = 1.0f;
+            //u_elems[((num_rows*(k+2))+k+2)] = 1.0f;
+            //u_elems[((num_rows*(k+3))+k+3)] = 1.0f;
+        }
+//        printf("Set princ to 1\n");
+        
+        for(i=(k+1); i< (num_rows/4); i++)
+        {
+            iptr = _mm_load1_ps(&u_elems[((num_rows*i)+k)]);
 //            jptr = _mm_load1_ps(&U.elements[num_rows*i+j];
             //iptr = &vector_u[num_rows*i+k];
             //jptr = iptr+(num_rows/4); 
             //inkptr = &vector_u[((num_rows/4)*k)+k];
-            for(j=(k+1); j<(num_rows/4)-1; j++)
+            for(j=(k+1); j<(num_rows/4); j++)
             {
-                jptr = _mm_load_ps(&U.elements[num_rows*i+j]);
-                inkptr = _mm_load_ps(&U.elements[num_rows*k + j]);
+                  //  printf("k:%d    j:%d\n",k,j);
+                
+                iptr = _mm_load1_ps(&u_elems[((num_rows*i)+k)*4]);
+                jptr = _mm_load_ps(&u_elems[((num_rows*i)+j)*4]);
+                inkptr = _mm_load_ps(&u_elems[((num_rows*k) + j)*4]);
+                
+                temp = _mm_mul_ps(iptr,inkptr);
+                jptr = _mm_sub_ps(jptr,temp);
+                _mm_store_ps(&u_elems[((num_rows*i)+j)*4],jptr); 
+/*
+                iptr = _mm_load1_ps(&u_elems[((num_rows*i)+k)]);
+                jptr = _mm_load_ps(&u_elems[((num_rows*(i))+j)*4]);
+                inkptr = _mm_load_ps(&u_elems[((num_rows*k) + j*4)]);
 
                 temp = _mm_mul_ps(iptr,inkptr);
-                temp2 = _mm_div_ps(jptr,temp);
-                jptr = temp2;
-                float temp_v;// = malloc(4*sizeof(float));
-                _mm_store_ps(&temp_v,temp2);
-                memcpy(&U.elements[num_rows*i+j],&temp_v,sizeof(temp_v));
-                //jptr++;
-                //inkptr++;
+                jptr = _mm_sub_ps(jptr,temp);
+                _mm_store_ps(&u_elems[((num_rows*i)+j*4)],jptr);
+  */              
             }
-            __m128* lower_tri = (__m128*) &vector_u[i*num_rows+k];
-             *lower_tri = _mm_mul_ps(zero,zero);
-            iptr = _mm_mul_ps(zero,zero);
-           // U.elements[num_rows*i+k] = 0;
-            //iptr++;
+    
+        //for(z=i*4; z>(i*4)-4; z--)
+          //  {
+            //if(i < 0)
+              //  break;
+                u_elems[((num_rows*i)+k)] = 0.0f;       
+            //}
+            //for(j=i*4; j<(i*4)+4; j++)
+                //u_elems[((num_rows*j)+k)] = 0;
+
+            //printf("Made it to end of loop\n"); 
         }
-        kptr++;
-    } 
+    }
+//    memcpy(U.elements,u_elems,sizeof(U.elements));
 }
 
 
@@ -170,11 +186,29 @@ int
 check_results(float *A, float *B, unsigned int size, float tolerance)   /* Check if refernce results match multi threaded results. */
 {
     int num_off = 0;
-	for(int i = 0; i < size; i++)
-		if(fabsf(A[i] - B[i]) > tolerance)
-            num_off++;    
+    int num_miss_zeros = 0;
+    int num_hit_zeros = 0;
+    int num_hit_ones = 0;
+    int expected_1s = 0;
+    int expected_0s = 0;
 
-    printf("Percent difference: %f\n",num_off/(size*1.0));
+	for(int i = 0; i < size; i++){
+        if(A[i] == 1)
+            expected_1s++;
+        if(A[i] == 0)
+            expected_0s++;
+		if(fabsf(A[i] - B[i]) > tolerance){
+            num_off++;    
+    //        printf("Expected:%f   Actual: %f\n",A[i],B[i]); 
+            if(A[i] == 0)
+                num_miss_zeros++;
+        }
+        else if(A[i] == 0)
+            num_hit_zeros++;
+        else if(A[i] == 1)
+            num_hit_ones++;
+    }
+    printf("Percent difference: %f\nPercentage of non-zeros: %f\nPercentage hit 0: %f\n Percentage hit 1: %f\n",num_off/(size*1.0),num_miss_zeros/(size*1.0),num_hit_zeros/(expected_0s*1.0),num_hit_ones/(expected_1s*1.0));
 
     if(num_off != 0)
         return 0;
