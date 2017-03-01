@@ -44,7 +44,7 @@ main(int argc, char** argv) {
 		
 	/* Gaussian elimination using the reference code. */
 	Matrix reference = allocate_matrix(MATRIX_SIZE, MATRIX_SIZE, 0);
-	struct timeval start, stop;	
+	struct timeval start, stop,start2,stop2;	
 	gettimeofday(&start, NULL);
 
 	printf("Performing gaussian elimination using the reference code. \n");
@@ -67,9 +67,14 @@ main(int argc, char** argv) {
 	/* WRITE THIS CODE: Perform the Gaussian elimination using the SSE version. 
      * The resulting upper triangular matrix should be returned in U
      * */
-	gauss_eliminate_using_sse(A, U);
+
+    gettimeofday(&start2, NULL);
+    gauss_eliminate_using_sse(A, U);
+    gettimeofday(&stop2, NULL);
 
 	/* Check if the SSE result is equivalent to the expected solution. */
+    printf("SSE run time = %0.2f s. \n", (float)(stop2.tv_sec - start2.tv_sec + (stop2.tv_usec - start2.tv_usec)/(float)1000000));
+
 	int size = MATRIX_SIZE*MATRIX_SIZE;
 	int res = check_results(reference.elements, U.elements, size, 0.001f);
 	printf("Test %s\n", (1 == res) ? "PASSED" : "FAILED");
