@@ -1,0 +1,57 @@
+Timings:
+
+512:
+Kernel Runtime: 0.000337
+Overhead: 1.072433
+ Percent Overhead: 99.968590
+CPU run time = 0.03 s
+Device run time = 1.07 s
+ Speedup: 0.03 x
+Max epsilon = 0.000000.
+Off by: 0
+Test PASSED
+
+1024:
+Kernel Runtime: 0.000802
+Overhead: 1.033979
+ Percent Overhead: 99.922493
+CPU run time = 0.09 s
+Device run time = 1.03 s
+ Speedup: 0.08 x
+Max epsilon = 0.000000.
+Off by: 0
+Test PASSED
+
+2048:
+Kernel Runtime: 0.002635
+Overhead: 1.039104
+ Percent Overhead: 99.747063
+CPU run time = 0.31 s
+Device run time = 1.04 s
+ Speedup: 0.30 x
+Max epsilon = 0.000000.
+Off by: 0
+Test PASSED
+
+4096:
+untime: 0.010007
+Overhead: 1.176694
+ Percent Overhead: 99.156738
+CPU run time = 1.16 s
+Device run time = 1.19 s
+ Speedup: 0.98 x
+Max epsilon = 0.000000.
+Off by: 0
+Test PASSED
+
+8192:
+Kernel Runtime: 0.035626
+Overhead: 1.349297
+ Percent Overhead: 97.427574
+CPU run time = 4.39 s
+Device run time = 1.39 s
+ Speedup: 3.17 x
+Max epsilon = 0.000000.
+Off by: 0
+Test PASSED
+

@@ -69,6 +69,9 @@ int main(int argc, char** argv)
 
 void ConvolutionOnDevice(const Matrix M, const Matrix N, Matrix P)
 {
+    struct timeval start1, stop1, start2, stop2;
+
+    gettimeofday(&start1,NULL);
     // Load M and N to the device
     Matrix Md = AllocateDeviceMatrix(M);
     CopyToDeviceMatrix(Md, M);
@@ -82,9 +85,13 @@ void ConvolutionOnDevice(const Matrix M, const Matrix N, Matrix P)
     // Setup the execution configuration
     dim3 dimBlock(THREAD_BLOCK_SIZE, THREAD_BLOCK_SIZE);
     dim3 dimGrid(N.width/dimBlock.x,N.height/dimBlock.y);
-    
+
+    gettimeofday(&start2,NULL);
     // Launch the device computation threads!
     ConvolutionKernel<<<dimGrid,dimBlock>>>(Md,Nd,Pd);
+    cudaThreadSynchronize();
+
+    gettimeofday(&stop2,NULL);
     
     // Read P from the device
     CopyFromDeviceMatrix(P, Pd); 
@@ -93,7 +100,12 @@ void ConvolutionOnDevice(const Matrix M, const Matrix N, Matrix P)
     FreeDeviceMatrix(&Md);
     FreeDeviceMatrix(&Nd);
     FreeDeviceMatrix(&Pd);
-
+    
+    gettimeofday(&stop1,NULL);
+    
+    float kernel_runtime = (float)(stop2.tv_sec - start2.tv_sec + (stop2.tv_usec - start2.tv_usec)/(float)1000000);
+    float overhead = (float)(stop1.tv_sec - start1.tv_sec + (stop1.tv_usec - start1.tv_usec)/(float)1000000) - kernel_runtime;
+    printf("Kernel Runtime: %f\nOverhead: %f\n Percent Overhead: %f\n",kernel_runtime,overhead,(100*overhead)/(overhead + kernel_runtime));
 }
 
 // Allocate a device matrix of same size as M.
