@@ -19,7 +19,7 @@ LD_LIBRARY_PATH	:= /usr/local/cuda/lib64
 
 all: 2Dconvolution
 
-2Dconvolution: 2Dconvolution.cu 2Dconvolution_gold.cpp 
+2Dconvolution: 2Dconvolution.cu 2Dconvolution_gold.cpp 2Dconvolution_kernel.cu 
 	$(NVCC) -o 2Dconvolution 2Dconvolution.cu 2Dconvolution_gold.cpp $(NVCCFLAGS)
 
 clean:

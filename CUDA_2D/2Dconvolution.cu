@@ -72,14 +72,20 @@ void ConvolutionOnDevice(const Matrix M, const Matrix N, Matrix P)
     CopyToDeviceMatrix(Pd, P); // Clear memory
 
     // Setup the execution configuration
-
-
- 
+    //dim3 threadsPerBlock(5,5);
+    //dim3 numBlocks(MATRIX_SIZE/5,MATRIX_SIZE/5);
+    dim3 dimBlock(M.width, M.height);
+    dim3 dimGrid(N.width/dimBlock.x,N.height/dimBlock.y);
     // Launch the device computation threads!
-
+    ConvolutionKernel<<<dimGrid,dimBlock>>>(Md,Nd,Pd);
+    cudaThreadSynchronize(); 
+    
     // Read P from the device
     CopyFromDeviceMatrix(P, Pd); 
-
+    
+    for(int i=0; i<P.height; i++)
+        printf("%f\n",P.elements[i]);
+    
     // Free device matrices
     FreeDeviceMatrix(&Md);
     FreeDeviceMatrix(&Nd);
@@ -159,9 +165,10 @@ checkResults(float *reference, float *gpu_result, int num_elements, float thresh
 {
     int checkMark = 1;
     float epsilon = 0.0;
-    
+    int offBy = 0;
     for(int i = 0; i < num_elements; i++)
         if(fabsf((reference[i] - gpu_result[i])/reference[i]) > threshold){
+            offBy++;
             checkMark = 0;
         }
 
@@ -170,6 +177,6 @@ checkResults(float *reference, float *gpu_result, int num_elements, float thresh
             epsilon = fabsf((reference[i] - gpu_result[i])/reference[i]);
         }
 
-    printf("Max epsilon = %f. \n", epsilon); 
+    printf("Max epsilon = %f. \nOff by: %d\n", epsilon, offBy); 
     return checkMark;
 }
