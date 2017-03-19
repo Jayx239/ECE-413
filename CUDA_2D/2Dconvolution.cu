@@ -74,7 +74,7 @@ void ConvolutionOnDevice(const Matrix M, const Matrix N, Matrix P)
     // Setup the execution configuration
     //dim3 threadsPerBlock(5,5);
     //dim3 numBlocks(MATRIX_SIZE/5,MATRIX_SIZE/5);
-    dim3 dimBlock(M.width, M.height);
+    dim3 dimBlock(THREAD_BLOCK_SIZE, THREAD_BLOCK_SIZE);
     dim3 dimGrid(N.width/dimBlock.x,N.height/dimBlock.y);
     // Launch the device computation threads!
     ConvolutionKernel<<<dimGrid,dimBlock>>>(Md,Nd,Pd);
@@ -82,9 +82,6 @@ void ConvolutionOnDevice(const Matrix M, const Matrix N, Matrix P)
     
     // Read P from the device
     CopyFromDeviceMatrix(P, Pd); 
-    
-    for(int i=0; i<P.height; i++)
-        printf("%f\n",P.elements[i]);
     
     // Free device matrices
     FreeDeviceMatrix(&Md);
