@@ -20,7 +20,6 @@ __global__ void ConvolutionKernel(Matrix M, Matrix N, Matrix P)
         for(int n=nBeg; n < nEnd; n++)     
             sum += M.elements[M.width*m + n] * N.elements[N.width*(i + m-2) + ((j + n-2))];
         
-//    __syncthreads();
     P.elements[ N.width*i + j] = (float)sum;
 
 }

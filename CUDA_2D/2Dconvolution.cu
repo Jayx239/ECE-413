@@ -31,20 +31,28 @@ int main(int argc, char** argv)
 	Matrix  C;
 	
 	srand(time(NULL));
-	
+    struct timeval start1,stop1,start2,stop2;
+
 	// Allocate and initialize the matrices
 	A  = AllocateMatrix(KERNEL_SIZE, KERNEL_SIZE, 1);
 	B  = AllocateMatrix(MATRIX_SIZE, MATRIX_SIZE, 1);
 	C  = AllocateMatrix(B.height, B.width, 0);
 
-    
+    gettimeofday(&start1,NULL);    
    /* Convolve matrix B with matrix A on the CPU. */
    Matrix reference = AllocateMatrix(C.height, C.width, 0);
    computeGold(reference.elements, A.elements, B.elements, B.height, B.width);
-       
-	/* Convolve matrix B with matrix A on the device. */
+    gettimeofday(&stop1,NULL);   
+	
+    gettimeofday(&start2,NULL);
+    /* Convolve matrix B with matrix A on the device. */
    ConvolutionOnDevice(A, B, C);
-
+    gettimeofday(&stop2,NULL);
+    
+    float cpuruntime = (float)(stop1.tv_sec - start1.tv_sec + (stop1.tv_usec - start1.tv_usec)/(float)1000000);
+    float devruntime = (float)(stop2.tv_sec - start2.tv_sec + (stop2.tv_usec - start2.tv_usec)/(float)1000000);
+    
+    printf("CPU run time = %0.2f s\nDevice run time = %0.2f s\n Speedup: %0.2f x\n",cpuruntime,devruntime,cpuruntime/devruntime);
    /* Check if the device result is equivalent to the expected solution. */
     int num_elements = C.height * C.width;
 	int status = checkResults(reference.elements, C.elements, num_elements, 0.001f);
@@ -72,13 +80,11 @@ void ConvolutionOnDevice(const Matrix M, const Matrix N, Matrix P)
     CopyToDeviceMatrix(Pd, P); // Clear memory
 
     // Setup the execution configuration
-    //dim3 threadsPerBlock(5,5);
-    //dim3 numBlocks(MATRIX_SIZE/5,MATRIX_SIZE/5);
     dim3 dimBlock(THREAD_BLOCK_SIZE, THREAD_BLOCK_SIZE);
     dim3 dimGrid(N.width/dimBlock.x,N.height/dimBlock.y);
+    
     // Launch the device computation threads!
     ConvolutionKernel<<<dimGrid,dimBlock>>>(Md,Nd,Pd);
-    cudaThreadSynchronize(); 
     
     // Read P from the device
     CopyFromDeviceMatrix(P, Pd); 
