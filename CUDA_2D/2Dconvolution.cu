@@ -7,6 +7,7 @@
 // includes, kernels
 #include "2Dconvolution_kernel.cu"
 
+#define PRINT_RESULTS 0
 ////////////////////////////////////////////////////////////////////////////////
 // declarations, forward
 
@@ -63,9 +64,9 @@ int main(int argc, char** argv)
     C_opt = AllocateMatrix(B.height, B.width, 0);
 
    /* Convolve matrix B with matrix A on the CPU. */
-    gettimeofday(&start1,NULL);   
     Matrix reference = AllocateMatrix(C.height, C.width, 0);
-   computeGold(reference.elements, A.elements, B.elements, B.height, B.width);
+    gettimeofday(&start1,NULL);
+    computeGold(reference.elements, A.elements, B.elements, B.height, B.width);
     gettimeofday(&stop1,NULL);   
 	
     /* Convolve matrix B with matrix A on the device. */
@@ -141,7 +142,7 @@ float ConvolutionOnDevice(const Matrix M, const Matrix N, Matrix P)
 
     printf("Unoptimized Kernel Runtime: %f\nOverhead: %f\nPercent Overhead: %f\n\n",kernel_runtime,overhead,(100*overhead)/(overhead + kernel_runtime));
     
-    return overhead + kernel_runtime;
+    return kernel_runtime;
 }
 
 float OptimizedConvolutionOnDevice(const Matrix M, const Matrix N, Matrix P)
@@ -184,7 +185,7 @@ float OptimizedConvolutionOnDevice(const Matrix M, const Matrix N, Matrix P)
     
     printf("Optimized Kernel Runtime: %f\nOverhead: %f\nPercent Overhead: %f\n\n",kernel_runtime,overhead,(100*overhead)/(overhead + kernel_runtime));
     /* Return run time */
-    return overhead + kernel_runtime;
+    return kernel_runtime;
 }
 
 // Allocate a device matrix of same size as M.
@@ -260,12 +261,14 @@ checkResults(float *reference, float *gpu_result, int num_elements, float thresh
     int checkMark = 1;
     float epsilon = 0.0;
     int offBy = 0;
-    for(int i = 0; i < num_elements; i++)
+    for(int i = 0; i < num_elements; i++) {
         if(fabsf((reference[i] - gpu_result[i])/reference[i]) > threshold){
             offBy++;
             checkMark = 0;
         }
-
+        if(PRINT_RESULTS)
+        printf("%f : %f\n",reference[i],gpu_result[i]);
+    }
     for(int i = 0; i < num_elements; i++)
         if(fabsf((reference[i] - gpu_result[i])/reference[i]) > epsilon){
             epsilon = fabsf((reference[i] - gpu_result[i])/reference[i]);
